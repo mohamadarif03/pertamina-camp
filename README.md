@@ -1,36 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TenderFlow AI — Pertamina Camp 2026
 
-## Getting Started
+Prototype **Proyek 2: Digital Tender Collaboration and Intelligent Document Automation** untuk PT Pertamina Patra Niaga Regional Kalimantan x FILKOM UB.
 
-First, run the development server:
+## Ruang lingkup
+
+- D5 — Digital Pre-Bid & Berita Acara Auto-Gen
+- D6 — Evaluation Collaboration Hub
+- D7 — TKDN Real-Time Monitoring
+- D8 — Smart Doc/Berita Acara Assistant
+
+D1–D4 sengaja tidak dijadikan modul produk agar solusi tetap berada dalam batas resmi Proyek 2.
+
+## Menjalankan aplikasi
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka `http://localhost:3000`, pilih peran demo, lalu jelajahi alur D5–D8 pada satu tender yang sama.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Status prototype
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Prototype mendemonstrasikan interaksi dan state sesi lintas modul. Integrasi AI, autentikasi perusahaan, penyimpanan dokumen, PDF/DOCX, e-sign, dan API SAPP merupakan target implementasi lanjutan.

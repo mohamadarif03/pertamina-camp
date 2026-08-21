@@ -1,17 +1,10 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
 import { ProjectProvider } from "./context/ProjectContext";
 import "./globals.css";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-plus-jakarta-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-});
-
 export const metadata: Metadata = {
-  title: "Pertamina Patra Niaga - Digital Tender & Document Automation",
-  description: "Portal Kolaborasi Tender Digital & Otomatisasi Dokumen - Regional Kalimantan",
+  title: "TenderFlow AI — Proyek 2 Pertamina Camp 2026",
+  description: "Digital Tender Collaboration and Intelligent Document Automation untuk Pertamina Patra Niaga Regional Kalimantan.",
 };
 
 export default function RootLayout({
@@ -20,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={plusJakartaSans.variable}>
+    <html lang="id">
       <body>
         <ProjectProvider>
           {children}
@@ -29,5 +22,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-

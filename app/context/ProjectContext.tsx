@@ -1,235 +1,164 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 
-// Types
-export interface QAItem {
+export type Role = "panitia" | "evaluator" | "vendor" | "approver";
+export type ModuleId = "overview" | "prebid" | "evaluation" | "tkdn" | "documents";
+export type QuestionStatus = "Masuk" | "Dibahas" | "Terjawab" | "Menjadi Adendum";
+
+export interface Question {
   id: number;
   vendor: string;
+  clause: string;
+  category: "Teknis" | "Komersial" | "Administrasi";
   question: string;
-  status: "Pending Answer" | "Answered";
   answer?: string;
-  timestamp: string;
+  status: QuestionStatus;
+  time: string;
 }
 
-export interface Guarantee {
-  id: number;
-  type: string;
-  bank: string;
-  amount: number;
-  expiry: string;
-  status: "Valid" | "Expiring" | "Expired";
+export interface VendorEvaluation {
+  id: string;
   vendor: string;
-}
-
-export interface ScoreData {
+  initials: string;
   technical: number;
   commercial: number;
-  notes: string;
+  tkdn: number;
+  price: number;
+  priceDeviation: number;
+  clarification: "Tidak diperlukan" | "Menunggu respons" | "Diterima";
+  note: string;
 }
 
-export interface ProjectFormData {
-  jobName: string;
-  requestingFunction: string;
-  oe: number;
-  tkdnTarget: number;
+export interface TKDNRecord {
+  id: string;
+  vendor: string;
+  domestic: number;
+  foreign: number;
+  evidence: number;
+  verified: boolean;
 }
 
-export interface ProjectChecklist {
-  pr: boolean;
-  oe: boolean;
-  justification: boolean;
-  pakta: boolean;
-  tkdn: boolean;
-  hctad: boolean;
+export interface AuditEvent {
+  id: number;
+  actor: string;
+  action: string;
+  object: string;
+  time: string;
 }
 
-interface ProjectContextType {
-  formData: ProjectFormData;
-  setFormData: React.Dispatch<React.SetStateAction<ProjectFormData>>;
-  checklist: ProjectChecklist;
-  setChecklist: React.Dispatch<React.SetStateAction<ProjectChecklist>>;
-  qaList: QAItem[];
-  setQaList: React.Dispatch<React.SetStateAction<QAItem[]>>;
-  guarantees: Guarantee[];
-  setGuarantees: React.Dispatch<React.SetStateAction<Guarantee[]>>;
-  vendorScores: Record<string, ScoreData>;
-  setVendorScores: React.Dispatch<React.SetStateAction<Record<string, ScoreData>>>;
-  activeRole: string;
-  setActiveRole: (role: string) => void;
-  submitterTab: string;
-  setSubmitterTab: React.Dispatch<React.SetStateAction<string>>;
-  dp3Approved: boolean | null;
-  setDp3Approved: (val: boolean | null) => void;
-  lhpApproved: boolean | null;
-  setLhpApproved: (val: boolean | null) => void;
+interface ProjectContextValue {
+  module: ModuleId;
+  setModule: (module: ModuleId) => void;
+  questions: Question[];
+  addQuestion: (question: Pick<Question, "clause" | "category" | "question">) => void;
+  answerQuestion: (id: number, answer: string, asAddendum: boolean) => void;
+  evaluations: VendorEvaluation[];
+  updateScore: (id: string, score: number) => void;
+  tkdnRecords: TKDNRecord[];
+  updateTKDN: (id: string, domestic: number, foreign: number) => void;
+  verifyTKDN: (id: string) => void;
+  audit: AuditEvent[];
+  documentStatus: "AI Draft" | "In review" | "Approved";
+  setDocumentStatus: (status: "AI Draft" | "In review" | "Approved") => void;
 }
 
-const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
+const ProjectContext = createContext<ProjectContextValue | null>(null);
 
-const DEFAULT_FORM_DATA: ProjectFormData = {
-  jobName: "Jasa Penyelenggaraan Transportasi & Distribusi BBM - Balikpapan",
-  requestingFunction: "Fungsi Retail Sales Kalimantan",
-  oe: 23000000000,
-  tkdnTarget: 25,
-};
-
-const DEFAULT_CHECKLIST: ProjectChecklist = {
-  pr: true,
-  oe: true,
-  justification: true,
-  pakta: false,
-  tkdn: false,
-  hctad: false,
-};
-
-const DEFAULT_QA_LIST: QAItem[] = [
+const defaultQuestions: Question[] = [
   {
     id: 1,
     vendor: "PT Borneo Jaya Utama",
-    question: "Apakah sertifikat TKDN untuk komponen TAD dapat digabung dalam satu form B1?",
-    status: "Pending Answer",
-    timestamp: "10:15 WITA",
+    clause: "RKS § 4.2 — Personel",
+    category: "Teknis",
+    question: "Apakah sertifikasi pengemudi defensif dapat dipenuhi maksimal 30 hari setelah kontrak dimulai?",
+    answer: "Sertifikasi wajib tersedia sebelum mobilisasi. Bukti dilampirkan pada penawaran teknis.",
+    status: "Terjawab",
+    time: "09:42 WITA",
   },
   {
     id: 2,
     vendor: "CV Mahakam Perkasa",
-    question: "Berapa lama masa jaminan penawaran (Bid Bond) yang disyaratkan sejak pembukaan tender?",
-    status: "Answered",
-    answer: "Masa berlaku Bid Bond minimal adalah 120 hari kalender terhitung sejak batas akhir pemasukan dokumen penawaran.",
-    timestamp: "09:45 WITA",
+    clause: "RKS § 7.1 — TKDN",
+    category: "Administrasi",
+    question: "Apakah Form B1 dapat diperbarui setelah klarifikasi apabila terdapat koreksi komponen biaya?",
+    status: "Dibahas",
+    time: "10:08 WITA",
   },
-];
-
-const DEFAULT_GUARANTEES: Guarantee[] = [
   {
-    id: 1,
-    type: "Jaminan Penawaran (Bid Bond)",
-    bank: "Bank Mandiri",
-    amount: 1150000000,
-    expiry: "2026-11-15",
-    status: "Valid",
-    vendor: "PT Borneo Jaya Utama",
+    id: 3,
+    vendor: "PT Kutai Energi Logistik",
+    clause: "RKS § 9.3 — Pemeliharaan",
+    category: "Komersial",
+    question: "Mohon konfirmasi apakah biaya preventive maintenance sudah termasuk dalam harga bulanan.",
+    answer: "Biaya wajib termasuk dalam harga satuan bulanan dan akan ditegaskan melalui Adendum 01.",
+    status: "Menjadi Adendum",
+    time: "10:21 WITA",
   },
 ];
 
-const DEFAULT_SCORES: Record<string, ScoreData> = {
-  vendorA: { technical: 85, commercial: 90, notes: "Kualifikasi dan armada memenuhi seluruh standar HSSE Pertamina." },
-  vendorB: { technical: 72, commercial: 98, notes: "Skor komersial tinggi karena harga murah, namun terdapat harga timpang di item pemeliharaan." },
-  vendorC: { technical: 90, commercial: 85, notes: "Skor teknis tertinggi, memiliki sertifikasi TKDN melebihi standar minimum." },
-};
+const defaultEvaluations: VendorEvaluation[] = [
+  { id: "v1", vendor: "PT Borneo Jaya Utama", initials: "BJ", technical: 88, commercial: 86, tkdn: 34.5, price: 22.45, priceDeviation: -2.4, clarification: "Tidak diperlukan", note: "Dokumen teknis lengkap dan metode kerja terukur." },
+  { id: "v2", vendor: "CV Mahakam Perkasa", initials: "MP", technical: 76, commercial: 92, tkdn: 27.8, price: 18.72, priceDeviation: -18.6, clarification: "Menunggu respons", note: "Item maintenance terindikasi di bawah ambang kewajaran." },
+  { id: "v3", vendor: "PT Kutai Energi Logistik", initials: "KE", technical: 91, commercial: 81, tkdn: 38.2, price: 23.18, priceDeviation: 0.8, clarification: "Diterima", note: "Skor teknis tertinggi dan bukti TKDN paling lengkap." },
+];
+
+const defaultTKDN: TKDNRecord[] = [
+  { id: "v1", vendor: "PT Borneo Jaya Utama", domestic: 7.74, foreign: 14.71, evidence: 4, verified: true },
+  { id: "v2", vendor: "CV Mahakam Perkasa", domestic: 5.20, foreign: 13.52, evidence: 2, verified: false },
+  { id: "v3", vendor: "PT Kutai Energi Logistik", domestic: 8.85, foreign: 14.33, evidence: 5, verified: true },
+];
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
-  const [formData, setFormData] = useState<ProjectFormData>(DEFAULT_FORM_DATA);
-  const [checklist, setChecklist] = useState<ProjectChecklist>(DEFAULT_CHECKLIST);
-  const [qaList, setQaList] = useState<QAItem[]>(DEFAULT_QA_LIST);
-  const [guarantees, setGuarantees] = useState<Guarantee[]>(DEFAULT_GUARANTEES);
-  const [vendorScores, setVendorScores] = useState<Record<string, ScoreData>>(DEFAULT_SCORES);
-  const [activeRole, setActiveRoleState] = useState<string>("portal");
-  const [submitterTab, setSubmitterTab] = useState<string>("dashboard");
-  const [dp3Approved, setDp3Approved] = useState<boolean | null>(null);
-  const [lhpApproved, setLhpApproved] = useState<boolean | null>(null);
+  const [module, setModule] = useState<ModuleId>("overview");
+  const [questions, setQuestions] = useState(defaultQuestions);
+  const [evaluations, setEvaluations] = useState(defaultEvaluations);
+  const [tkdnRecords, setTkdnRecords] = useState(defaultTKDN);
+  const [documentStatus, setDocumentStatus] = useState<"AI Draft" | "In review" | "Approved">("AI Draft");
+  const [audit, setAudit] = useState<AuditEvent[]>([
+    { id: 1, actor: "Nadia Prameswari", action: "memverifikasi bukti", object: "TKDN PT Borneo Jaya Utama", time: "Hari ini, 10:31" },
+    { id: 2, actor: "Budi Hartono", action: "menandai keputusan", object: "Q&A RKS § 9.3 sebagai Adendum 01", time: "Hari ini, 10:24" },
+    { id: 3, actor: "AI Document Assistant", action: "membuat versi 0.3", object: "Draf BA Pre-Bid", time: "Hari ini, 10:22" },
+  ]);
 
-  // Load from local storage
-  useEffect(() => {
-    try {
-      const storedForm = localStorage.getItem("pp_form");
-      if (storedForm) setFormData(JSON.parse(storedForm));
-
-      const storedChecklist = localStorage.getItem("pp_checklist");
-      if (storedChecklist) setChecklist(JSON.parse(storedChecklist));
-
-      const storedQa = localStorage.getItem("pp_qa");
-      if (storedQa) setQaList(JSON.parse(storedQa));
-
-      const storedGuarantees = localStorage.getItem("pp_guarantees");
-      if (storedGuarantees) setGuarantees(JSON.parse(storedGuarantees));
-
-      const storedScores = localStorage.getItem("pp_scores");
-      if (storedScores) setVendorScores(JSON.parse(storedScores));
-
-      const storedRole = localStorage.getItem("pp_role");
-      if (storedRole) setActiveRoleState(storedRole);
-
-      const storedDp3 = localStorage.getItem("pp_dp3_approved");
-      if (storedDp3) setDp3Approved(JSON.parse(storedDp3));
-
-      const storedLhp = localStorage.getItem("pp_lhp_approved");
-      if (storedLhp) setLhpApproved(JSON.parse(storedLhp));
-    } catch (e) {
-      console.error("Error loading localStorage", e);
-    }
-  }, []);
-
-  // Sync to local storage
-  useEffect(() => {
-    localStorage.setItem("pp_form", JSON.stringify(formData));
-  }, [formData]);
-
-  useEffect(() => {
-    localStorage.setItem("pp_checklist", JSON.stringify(checklist));
-  }, [checklist]);
-
-  useEffect(() => {
-    localStorage.setItem("pp_qa", JSON.stringify(qaList));
-  }, [qaList]);
-
-  useEffect(() => {
-    localStorage.setItem("pp_guarantees", JSON.stringify(guarantees));
-  }, [guarantees]);
-
-  useEffect(() => {
-    localStorage.setItem("pp_scores", JSON.stringify(vendorScores));
-  }, [vendorScores]);
-
-  useEffect(() => {
-    localStorage.setItem("pp_role", activeRole);
-  }, [activeRole]);
-
-  useEffect(() => {
-    localStorage.setItem("pp_dp3_approved", JSON.stringify(dp3Approved));
-  }, [dp3Approved]);
-
-  useEffect(() => {
-    localStorage.setItem("pp_lhp_approved", JSON.stringify(lhpApproved));
-  }, [lhpApproved]);
-
-  const setActiveRole = (role: string) => {
-    setActiveRoleState(role);
+  const log = (actor: string, action: string, object: string) => {
+    setAudit((items) => [{ id: Date.now(), actor, action, object, time: "Baru saja" }, ...items].slice(0, 12));
   };
 
-  return (
-    <ProjectContext.Provider
-      value={{
-        formData,
-        setFormData,
-        checklist,
-        setChecklist,
-        qaList,
-        setQaList,
-        guarantees,
-        setGuarantees,
-        vendorScores,
-        setVendorScores,
-        activeRole,
-        setActiveRole,
-        submitterTab,
-        setSubmitterTab,
-        dp3Approved,
-        setDp3Approved,
-        lhpApproved,
-        setLhpApproved,
-      }}
-    >
-      {children}
-    </ProjectContext.Provider>
-  );
+  const addQuestion = (input: Pick<Question, "clause" | "category" | "question">) => {
+    setQuestions((items) => [...items, { ...input, id: Date.now(), vendor: "PT Borneo Jaya Utama", status: "Masuk", time: "Baru saja" }]);
+    log("PT Borneo Jaya Utama", "mengajukan pertanyaan", input.clause);
+  };
+
+  const answerQuestion = (id: number, answer: string, asAddendum: boolean) => {
+    const item = questions.find((question) => question.id === id);
+    setQuestions((items) => items.map((question) => question.id === id ? { ...question, answer, status: asAddendum ? "Menjadi Adendum" : "Terjawab" } : question));
+    log("Budi Hartono", asAddendum ? "menandai sebagai adendum" : "menjawab pertanyaan", item?.clause ?? "Pre-Bid");
+  };
+
+  const updateScore = (id: string, score: number) => {
+    setEvaluations((items) => items.map((item) => item.id === id ? { ...item, technical: score } : item));
+    const vendor = evaluations.find((item) => item.id === id)?.vendor ?? "vendor";
+    log("Nadia Prameswari", "memperbarui skor teknis", vendor);
+  };
+
+  const updateTKDN = (id: string, domestic: number, foreign: number) => {
+    setTkdnRecords((items) => items.map((item) => item.id === id ? { ...item, domestic, foreign, verified: false } : item));
+    log("Vendor", "memperbarui komponen TKDN", tkdnRecords.find((item) => item.id === id)?.vendor ?? "vendor");
+  };
+
+  const verifyTKDN = (id: string) => {
+    setTkdnRecords((items) => items.map((item) => item.id === id ? { ...item, verified: true } : item));
+    log("Nadia Prameswari", "memverifikasi bukti TKDN", tkdnRecords.find((item) => item.id === id)?.vendor ?? "vendor");
+  };
+
+  const value = { module, setModule, questions, addQuestion, answerQuestion, evaluations, updateScore, tkdnRecords, updateTKDN, verifyTKDN, audit, documentStatus, setDocumentStatus };
+
+  return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>;
 }
 
 export function useProject() {
   const context = useContext(ProjectContext);
-  if (!context) {
-    throw new Error("useProject must be used within a ProjectProvider");
-  }
+  if (!context) throw new Error("useProject must be used inside ProjectProvider");
   return context;
 }
