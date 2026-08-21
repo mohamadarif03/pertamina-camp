@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local competition materials and generated proposal outputs
+/guideline/
+/proposal/

@@ -5,7 +5,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { ModuleId, Role, useProject } from "../context/ProjectContext";
 
 const moduleMeta: Record<ModuleId, { code: string; label: string; hint: string }> = {
-  overview: { code: "P2", label: "Command Center", hint: "Ringkasan tender aktif" },
+  overview: { code: "P2", label: "Decision Workspace", hint: "Gate, bukti, dan tindakan" },
   prebid: { code: "D5", label: "Digital Pre-Bid", hint: "Q&A, keputusan, dan BA" },
   evaluation: { code: "D6", label: "Evaluation Hub", hint: "Komparasi dan kolaborasi" },
   tkdn: { code: "D7", label: "TKDN Monitor", hint: "Realisasi dan verifikasi" },
@@ -93,34 +93,40 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
 function Overview({ onOpen }: { onOpen: (id: ModuleId) => void }) {
   const { questions, evaluations, tkdnRecords, audit, documentStatus } = useProject();
   const answered = questions.filter((q) => q.status === "Terjawab" || q.status === "Menjadi Adendum").length;
+  const unanswered = questions.length - answered;
+  const openClarifications = evaluations.filter((item) => item.clarification === "Menunggu respons").length;
+  const unverifiedTKDN = tkdnRecords.filter((item) => !item.verified).length;
   const avgTkdn = tkdnRecords.reduce((sum, item) => sum + item.domestic / (item.domestic + item.foreign) * 100, 0) / tkdnRecords.length;
+  const gates = [
+    { id: "prebid", code: "D5", title: "Pre-bid & ketetapan", state: unanswered ? "review" : "ready", status: unanswered ? `${unanswered} Q&A terbuka` : "Lengkap", evidence: "RKS § 4.2, RKS § 7.1, Adendum 01", rule: "Hanya Q&A berpasal dengan status selesai yang masuk BA.", action: unanswered ? "Tinjau Q&A yang belum selesai" : "Buka BA Pre-Bid" },
+    { id: "evaluation", code: "D6", title: "Klarifikasi evaluasi", state: openClarifications ? "blocked" : "ready", status: openClarifications ? `${openClarifications} klarifikasi terbuka` : "Lengkap", evidence: "OE item maintenance, respons vendor, rubrik evaluator", rule: "LHP tidak dapat diajukan selama klarifikasi material belum ditutup.", action: openClarifications ? "Buka klarifikasi harga" : "Buka matriks evaluasi" },
+    { id: "tkdn", code: "D7", title: "Bukti TKDN", state: unverifiedTKDN ? "blocked" : "ready", status: unverifiedTKDN ? `${unverifiedTKDN} bukti perlu verifikasi` : "Terverifikasi", evidence: "Form A1, Form B1, komponen DN/LN per vendor", rule: "Nilai TKDN dihitung deterministik, lalu bukti diverifikasi evaluator.", action: unverifiedTKDN ? "Verifikasi bukti TKDN" : "Buka rekap TKDN" },
+    { id: "documents", code: "D8", title: "Draf LHP & approval", state: openClarifications || unverifiedTKDN ? "blocked" : "review", status: openClarifications || unverifiedTKDN ? "Menunggu gate sebelumnya" : documentStatus, evidence: "Matriks evaluasi, TKDN, Q&A, keputusan, versi draf", rule: "AI hanya menyusun draf bersitasi; manusia mereview dan memutuskan.", action: "Buka evidence-backed draft" },
+  ] as const;
+  const [activeGateId, setActiveGateId] = useState<(typeof gates)[number]["id"]>("evaluation");
+  const [copilotMessage, setCopilotMessage] = useState("Pilih tindakan untuk melihat ringkasan berbasis bukti.");
+  const activeGate = gates.find((gate) => gate.id === activeGateId) ?? gates[0];
   return <>
-    <PageIntro eyebrow="Project 2 · Live workspace" title="Satu keputusan, satu jejak, satu dokumen." description="Kolaborasi tender dari pre-bid hingga LHP—terhubung, terukur, dan siap diaudit." action={<button className="primary-button" onClick={() => onOpen("documents")}>Buka draf terbaru →</button>} />
-    <section className="hero-status">
-      <div><span className="status-kicker">TENDER ID · PPN-KAL/2026/042</span><h2>Jasa TAD Operasional Distribusi BBM Regional Kalimantan</h2><p>Metode tender terbuka · 3 vendor · Tahap evaluasi penawaran</p></div>
-      <div className="readiness"><div className="readiness-ring"><strong>74</strong><span>%</span></div><div><small>Kesiapan keputusan</small><strong>2 item perlu tindakan</strong></div></div>
+    <PageIntro eyebrow="Project 2 · Decision Workspace" title="Lihat apa yang menahan keputusan." description="Bukan chatbot atau dashboard status biasa—satu ruang untuk melihat gate keputusan, bukti pendukung, aturan, dan tindakan berikutnya." action={<button className="primary-button" onClick={() => onOpen(activeGate.id)}>{activeGate.action} →</button>} />
+    <section className="decision-hero">
+      <div><span className="status-kicker">TENDER ID · PPN-KAL/2026/042</span><h2>Jasa TAD Operasional Distribusi BBM Regional Kalimantan</h2><p>3 vendor · tender terbuka · evaluasi penawaran · data demonstrasi</p></div>
+      <div className="decision-readiness"><div className="decision-ring"><strong>{openClarifications + unverifiedTKDN}</strong></div><div><small>Decision blockers</small><strong>Harus ditutup sebelum LHP</strong><span>AI tidak dapat melewati gate ini</span></div></div>
     </section>
     <div className="metric-grid">
       <Metric code="D5" value={`${answered}/${questions.length}`} label="Q&A terselesaikan" tone="blue" />
       <Metric code="D6" value={`${evaluations.length}`} label="Vendor dievaluasi" tone="red" />
       <Metric code="D7" value={`${avgTkdn.toFixed(1)}%`} label="Rata-rata TKDN" tone="green" />
-      <Metric code="D8" value="v0.3" label={`BA · ${documentStatus}`} tone="purple" />
+      <Metric code="D8" value="v0.3" label={`Draf dokumen · ${documentStatus}`} tone="purple" />
     </div>
-    <div className="content-grid two-one">
-      <section className="panel flow-panel"><div className="panel-heading"><div><span className="eyebrow">ALUR TERPADU</span><h3>Progress Proyek 2</h3></div><span className="soft-badge">Live</span></div>
-        <div className="flow-list">
-          {[
-            ["D5", "Pre-Bid & BA", "3 pertanyaan · 1 adendum", "prebid", "done"],
-            ["D6", "Evaluation Hub", "1 klarifikasi masih terbuka", "evaluation", "active"],
-            ["D7", "Verifikasi TKDN", "2 dari 3 vendor terverifikasi", "tkdn", "active"],
-            ["D8", "LHP & approval", "Draf v0.2 belum diajukan", "documents", "pending"],
-          ].map(([code, label, detail, id, state], index) => <button key={code} className="flow-item" onClick={() => onOpen(id as ModuleId)}><span className={`flow-node ${state}`}>{index + 1}</span><span><strong>{code} · {label}</strong><small>{detail}</small></span><b>→</b></button>)}
-        </div>
-      </section>
-      <section className="panel audit-panel"><div className="panel-heading"><div><span className="eyebrow">AUDIT TRAIL</span><h3>Aktivitas terbaru</h3></div></div>
-        <div className="audit-list">{audit.slice(0, 4).map((item) => <div className="audit-item" key={item.id}><span className="audit-dot"/><p><strong>{item.actor}</strong> {item.action} <b>{item.object}</b><small>{item.time}</small></p></div>)}</div>
-      </section>
+    <div className="decision-grid">
+      <section className="panel gate-panel"><div className="panel-heading"><div><span className="eyebrow">DECISION GATES</span><h3>Empat syarat sebelum keputusan</h3></div><span className="soft-badge">{openClarifications + unverifiedTKDN} blockers</span></div><div className="gate-list">{gates.map((gate, index) => <button key={gate.id} className={`gate-row ${activeGate.id === gate.id ? "selected" : ""}`} onClick={() => setActiveGateId(gate.id)}><span className={`gate-state ${gate.state}`}>{gate.state === "ready" ? "✓" : gate.state === "blocked" ? "!" : "…"}</span><span className="gate-index">{String(index + 1).padStart(2, "0")}</span><span className="gate-copy"><strong>{gate.code} · {gate.title}</strong><small>{gate.status}</small></span><span className={`gate-pill ${gate.state}`}>{gate.state === "ready" ? "Ready" : gate.state === "blocked" ? "Blocked" : "Review"}</span></button>)}</div></section>
+      <section className="panel trace-panel"><div className="trace-top"><div><span className="eyebrow">EVIDENCE TRACE</span><h3>{activeGate.code} · {activeGate.title}</h3><p>Setiap tindakan memiliki alasan yang dapat diperiksa.</p></div><span className={`gate-pill ${activeGate.state}`}>{activeGate.status}</span></div><div className="trace-steps"><div><span>01</span><p><small>BUKTI YANG DIPAKAI</small><strong>{activeGate.evidence}</strong></p></div><div><span>02</span><p><small>ATURAN SISTEM</small><strong>{activeGate.rule}</strong></p></div><div><span>03</span><p><small>LANGKAH BERIKUTNYA</small><strong>{activeGate.action}</strong></p><button className="text-button" onClick={() => onOpen(activeGate.id)}>Buka workspace →</button></div></div><div className="trace-footer"><span>◉</span> Jejak ini tersimpan sebagai audit event: actor · aksi · sumber · waktu · versi.</div></section>
     </div>
+    <div className="decision-support-grid">
+      <section className="panel comparison-panel"><div className="panel-heading"><div><span className="eyebrow">EVALUATION SNAPSHOT</span><h3>Bandingkan status, bukan memilih pemenang</h3></div><button className="text-button" onClick={() => onOpen("evaluation")}>Matriks lengkap →</button></div><div className="candidate-list">{evaluations.map((item) => <div className="candidate-row" key={item.id}><span className="candidate-initials">{item.initials}</span><div><strong>{item.vendor}</strong><small>{item.note}</small></div><span className={item.clarification === "Menunggu respons" ? "candidate-status attention" : "candidate-status"}>{item.clarification === "Menunggu respons" ? "Klarifikasi" : "Tersedia"}</span><button onClick={() => setCopilotMessage(`${item.vendor}: skor dan bukti tersedia untuk ditinjau. Sistem tidak memberi rekomendasi pemenang.`)} aria-label={`Lihat konteks ${item.vendor}`}>↗</button></div>)}</div></section>
+      <section className="panel copilot-panel"><div className="copilot-mark">AI</div><div><span className="eyebrow">CONTEXTUAL COPILOT</span><h3>Asisten bukti, bukan penentu pemenang.</h3></div><p>{copilotMessage}</p><div className="copilot-actions"><button onClick={() => setCopilotMessage("Ringkasan: LHP masih diblokir oleh satu klarifikasi harga dan satu bukti TKDN yang belum diverifikasi.")}>Apa yang menghambat?</button><button onClick={() => setCopilotMessage("Draf klarifikasi dapat dibuat dari item maintenance, OE, dan respons vendor yang tersedia. Panitia tetap mengirimkannya.")}>Buat draf klarifikasi</button></div></section>
+    </div>
+    <section className="panel audit-panel decision-audit"><div className="panel-heading"><div><span className="eyebrow">AUDIT TRAIL</span><h3>Aktivitas yang membentuk keputusan</h3></div><span className="soft-badge">append-only demo</span></div><div className="audit-list">{audit.slice(0, 4).map((item) => <div className="audit-item" key={item.id}><span className="audit-dot"/><p><strong>{item.actor}</strong> {item.action} <b>{item.object}</b><small>{item.time}</small></p></div>)}</div></section>
   </>;
 }
 
